@@ -53,7 +53,8 @@ final class ChatController extends AbstractController
                 'answer' => $answer,
             ]);
         } catch (\Throwable $exception) {
-            $logger->error('AI chat request failed.', [
+            $logger->error('AI chat request failed: '.$exception->getMessage(), [
+                'exception_class' => $exception::class,
                 'exception' => $exception,
             ]);
 
