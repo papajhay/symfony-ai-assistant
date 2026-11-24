@@ -19,5 +19,17 @@ services:
     App\:
         resource: '../src/'
 
+    ai.loader.markdown:
+        class: Symfony\AI\Store\Document\Loader\MarkdownLoader
+
+    ai.loader.docs:
+        class: Symfony\AI\Store\Document\Loader\DirectoryLoader
+        arguments:
+            - { md: '@ai.loader.markdown' }
+
+    Symfony\AI\Agent\Bridge\SimilaritySearch\SimilaritySearch:
+        arguments:
+            $retriever: '@ai.retriever.symfony_docs'
+
     # add more service definitions when explicit configuration is needed
     # please note that last definitions always *replace* previous ones
