@@ -1,18 +1,31 @@
 ai:
-    # see https://symfony.com/doc/current/ai/components/platform.html
     platform:
-    # fournisseur IA local
         ollama:
-            endpoint: '%env(OLLAMA_HOST_URL)%' # Adresse du serveur Ollama
-
-    # see https://symfony.com/doc/current/ai/bundles/ai-bundle.html
-    agent:  
+            endpoint: '%env(OLLAMA_HOST_URL)%'
+    agent:
         default:
-            # Plateforme utilisée par l'agent
             platform: 'ai.platform.ollama'
             model: 'llama3.2:3b'
             prompt:
-                text: 'Tu es un assistant pédagogique. Tu réponds toujours en français et tu expliques les concepts simplement aux débutants.'
-
-    # see https://symfony.com/doc/current/ai/components/store.html
+                file: '%kernel.project_dir%/prompts/assistant.txt'
+            tools:
+                services:
+                    - 'Symfony\AI\Agent\Bridge\SimilaritySearch\SimilaritySearch'
     store:
+        memory:
+            symfony_docs:
+                strategy: 'cosine'
+    vectorizer:
+        symfony_docs:
+            platform: 'ai.platform.ollama'
+            model: 'nomic-embed-text'
+    indexer:
+        symfony_docs:
+            source: '%kernel.project_dir%/data/docs'
+            loader: 'ai.loader.docs'
+            vectorizer: 'ai.vectorizer.symfony_docs'
+            store: 'ai.store.memory.symfony_docs'
+    retriever:
+        symfony_docs:
+            vectorizer: 'ai.vectorizer.symfony_docs'
+            store: 'ai.store.memory.symfony_docs'
