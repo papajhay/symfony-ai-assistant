@@ -11,6 +11,12 @@ use Symfony\Component\Routing\Attribute\Route;
 
 final class ChatController extends AbstractController
 {
+    #[Route('/chat', name: 'app_chat_ui', methods: ['GET'])]
+    public function index(): \Symfony\Component\HttpFoundation\Response
+    {
+        return $this->render('chat/index.html.twig');
+    }
+
     #[Route('/chat', name: 'app_chat', methods: ['POST'])]
     public function chat(
         Request $request,
