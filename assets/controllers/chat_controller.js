@@ -1,11 +1,13 @@
 import { Controller } from '@hotwired/stimulus';
 
 export default class extends Controller {
-    static targets = ['input', 'messages', 'welcome', 'loading', 'error', 'send'];
-    static values = { endpoint: String };
+    static targets = ['input', 'messages', 'welcome', 'loading', 'error', 'send', 'history'];
+    static values = { endpoint: String, conversations: String };
 
     connect() {
         this.pending = false;
+        this.conversationId = null;
+        this.refreshHistory();
     }
 
     enter(event) {
@@ -32,13 +34,17 @@ export default class extends Controller {
             const response = await fetch(this.endpointValue, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-                body: JSON.stringify({ question }),
+                body: JSON.stringify({ question, conversationId: this.conversationId }),
             });
             const result = await response.json().catch(() => ({}));
+            if (Number.isInteger(result.conversationId)) this.conversationId = result.conversationId;
             if (!response.ok) throw new Error(result.error || `Le serveur a répondu avec le statut ${response.status}.`);
             if (typeof result.answer !== 'string') throw new Error('La réponse du serveur est invalide.');
+            this.conversationId = result.conversationId;
             this.appendMessage('assistant', result.answer);
+            await this.refreshHistory();
         } catch (error) {
+            if (this.conversationId !== null) await this.refreshHistory();
             this.errorTarget.textContent = error instanceof TypeError
                 ? 'Impossible de joindre le serveur. Vérifiez que Symfony et Ollama sont démarrés.'
                 : error.message;
@@ -53,11 +59,61 @@ export default class extends Controller {
     }
 
     newConversation() {
+        this.conversationId = null;
         this.messagesTarget.replaceChildren();
         this.errorTarget.hidden = true;
         this.welcomeTarget.hidden = false;
         this.inputTarget.value = '';
         this.inputTarget.focus();
+        this.refreshHistory();
+    }
+
+    async refreshHistory() {
+        try {
+            const response = await fetch(this.conversationsValue, { headers: { Accept: 'application/json' } });
+            if (!response.ok) return;
+            const { conversations = [] } = await response.json();
+            this.historyTarget.replaceChildren();
+            if (!conversations.length) {
+                const empty = document.createElement('div'); empty.className = 'history-empty'; empty.textContent = 'Aucune conversation'; this.historyTarget.append(empty); return;
+            }
+            for (const conversation of conversations) {
+                const row = document.createElement('div'); row.className = `history-item${conversation.id === this.conversationId ? ' active' : ''}`;
+                const open = document.createElement('button'); open.type = 'button'; open.className = 'history-open'; open.textContent = conversation.title; open.title = conversation.title;
+                open.addEventListener('click', () => this.openConversation(conversation.id));
+                const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'history-delete'; remove.textContent = '×'; remove.title = 'Supprimer la conversation'; remove.setAttribute('aria-label', `Supprimer ${conversation.title}`);
+                remove.addEventListener('click', () => this.deleteConversation(conversation.id));
+                row.append(open, remove); this.historyTarget.append(row);
+            }
+        } catch { /* Keep the chat usable if history cannot be refreshed. */ }
+    }
+
+    async openConversation(id) {
+        if (this.pending) return;
+        this.errorTarget.hidden = true;
+        try {
+            const response = await fetch(`${this.conversationsValue}/${id}`, { headers: { Accept: 'application/json' } });
+            const result = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(result.error || 'Impossible de charger cette conversation.');
+            this.conversationId = result.id;
+            this.messagesTarget.replaceChildren();
+            for (const message of result.messages) this.appendMessage(message.role, message.content);
+            this.welcomeTarget.hidden = result.messages.length > 0;
+            this.inputTarget.value = '';
+            await this.refreshHistory();
+            this.scrollToLatest();
+        } catch (error) { this.errorTarget.textContent = error.message; this.errorTarget.hidden = false; }
+    }
+
+    async deleteConversation(id) {
+        if (!window.confirm('Supprimer cette conversation et tous ses messages ?')) return;
+        try {
+            const response = await fetch(`${this.conversationsValue}/${id}`, { method: 'DELETE', headers: { Accept: 'application/json' } });
+            const result = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(result.error || 'Impossible de supprimer cette conversation.');
+            if (id === this.conversationId) this.newConversation();
+            await this.refreshHistory();
+        } catch (error) { this.errorTarget.textContent = error.message; this.errorTarget.hidden = false; }
     }
 
     appendMessage(role, text) {
