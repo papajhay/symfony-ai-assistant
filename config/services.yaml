@@ -27,7 +27,7 @@ services:
         arguments:
             - { md: '@ai.loader.markdown' }
 
-    Symfony\AI\Agent\Bridge\SimilaritySearch\SimilaritySearch:
+    App\Agent\SafeSimilaritySearch:
         arguments:
             $retriever: '@ai.retriever.symfony_docs'
 

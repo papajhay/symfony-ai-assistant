@@ -9,8 +9,11 @@ ai:
             prompt:
                 file: '%kernel.project_dir%/prompts/assistant.txt'
             tools:
+                enabled: true
+                max_tool_calls: 5
+                fault_tolerant_toolbox: true
                 services:
-                    - 'Symfony\AI\Agent\Bridge\SimilaritySearch\SimilaritySearch'
+                    - 'App\Agent\SafeSimilaritySearch'
     store:
         memory:
             symfony_docs:
